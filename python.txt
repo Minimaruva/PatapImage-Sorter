@@ -1,0 +1,259 @@
+### Python Image Organizer App Plan
+
+#### **Project Structure (Git Repository)**
+```
+image-organizer/
+├── .gitignore
+├── README.md
+├── requirements.txt
+├── setup.py
+├── src/
+│   ├── basic_organizer.py
+│   ├── improved_organizer.py
+│   ├── smart_organizer.py
+│   └── utils/
+│       ├── file_utils.py
+│       ├── exif_utils.py
+│       ├── object_detection.py
+│       └── face_recognition.py
+├── config/
+│   ├── object_categories.json
+│   └── known_faces/
+│       ├── person1/
+│       │   ├── face1.jpg
+│       │   └── face2.jpg
+│       └── person2/
+│           └── face1.jpg
+├── tests/
+│   ├── test_basic.py
+│   ├── test_improved.py
+│   └── test_smart.py
+└── docs/
+    └── user_guide.md
+```
+
+---
+
+### **1. Basic Version: Sort by Date/Year**
+#### **Features**
+- Sort images into folders by `year/month` based on EXIF data or file creation date.
+- Supports JPEG/PNG/HEIC formats.
+
+#### **Implementation Steps**
+1. **EXIF Date Extraction**  
+   Use `exifread` to extract `DateTimeOriginal` from EXIF metadata.  
+   Fallback to file creation date if EXIF data is missing.
+
+2. **Directory Creation**  
+   Create nested folders (e.g., `2023/04`) using `pathlib`.
+
+3. **File Handling**  
+   Copy/move files to the target directory. Preserve original timestamps.
+
+#### **Code Skeleton**
+```python
+# src/basic_organizer.py
+from pathlib import Path
+import exifread
+import shutil
+
+def get_image_date(image_path: Path):
+    # Extract EXIF date or fallback to file creation time
+    ...
+
+def organize_by_date(input_dir: Path, output_dir: Path):
+    for img in input_dir.glob("*.*"):
+        date = get_image_date(img)
+        target_dir = output_dir / f"{date.year}/{date.month:02d}"
+        target_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(img, target_dir / img.name)
+```
+
+---
+
+### **2. Improved Version: Object Detection Sorting**
+#### **Features**
+- Sort images into user-defined folders (e.g., `sky`, `family`) using TensorFlow Lite/MobileNet.
+- Configurable object-to-folder mapping via `object_categories.json`.
+
+#### **Implementation Steps**
+1. **Object Detection**  
+   Use a pre-trained model (e.g., MobileNetV2) to detect objects in images.  
+   Output: List of detected objects with confidence scores.
+
+2. **Category Mapping**  
+   Load `object_categories.json` to map detected objects to folders:
+   ```json
+   {
+     "sky": ["sky", "cloud"],
+     "family": ["person", "dog"]
+   }
+   ```
+
+3. **Sorting Logic**  
+   For each image, select the best-matching category and move the file.
+
+#### **Code Skeleton**
+```python
+# src/improved_organizer.py
+import tensorflow as tf
+import numpy as np
+from PIL import Image
+
+def load_model():
+    # Load TensorFlow Lite model
+    ...
+
+def detect_objects(image_path: Path):
+    # Preprocess image and run inference
+    ...
+
+def organize_by_objects(input_dir: Path, output_dir: Path, config_path: Path):
+    model = load_model()
+    categories = json.load(config_path)
+    for img in input_dir.glob("*.*"):
+        objects = detect_objects(img)
+        for category, keywords in categories.items():
+            if any(obj in keywords for obj in objects):
+                shutil.copy2(img, output_dir / category / img.name)
+                break
+```
+
+---
+
+### **3. Final Revision: Face Recognition Sorting**
+#### **Features**
+- Learn faces from a `known_faces` directory and sort images into folders like `friends/john`.
+- Use `face_recognition` library (dlib-based).
+
+#### **Implementation Steps**
+1. **Face Encoding Database**  
+   Precompute face encodings for all images in `config/known_faces`.
+
+2. **Face Detection & Recognition**  
+   Detect faces in new images and compare encodings with the database.
+
+3. **Folder Naming**  
+   Use the name of the matched person for folder creation.
+
+#### **Code Skeleton**
+```python
+# src/smart_organizer.py
+import face_recognition
+from pathlib import Path
+
+def load_known_faces(known_faces_dir: Path):
+    # Load encodings and names from known_faces
+    ...
+
+def organize_by_faces(input_dir: Path, output_dir: Path, known_faces_dir: Path):
+    known_encodings, known_names = load_known_faces(known_faces_dir)
+    for img in input_dir.glob("*.*"):
+        image = face_recognition.load_image_file(img)
+        face_encodings = face_recognition.face_encodings(image)
+        for encoding in face_encodings:
+            matches = face_recognition.compare_faces(known_encodings, encoding)
+            if True in matches:
+                name = known_names[matches.index(True)]
+                shutil.copy2(img, output_dir / "friends" / name / img.name)
+```
+
+---
+
+### **Development Workflow**
+1. **Version Control**  
+   - Create a Git repository with branches for `basic`, `improved`, and `smart`.
+   - Use tags (`v1.0-basic`, `v2.0-improved`, `v3.0-smart`) for releases.
+
+2. **Testing**  
+   - Write unit tests for EXIF extraction, object detection, and face encoding.
+
+3. **Dependencies**  
+   - Pin versions in `requirements.txt`:
+     ```
+     exifread==3.0.0
+     pillow==9.5.0
+     tensorflow==2.10.0
+     face-recognition==1.3.0
+     ```
+
+4. **Documentation**  
+   - Add a CLI guide and configuration examples in `docs/user_guide.md`.
+
+---
+
+### **Potential Enhancements**
+- Parallel processing for large datasets.
+- GUI with PyQt/Tkinter.
+- Cloud integration (e.g., Google Photos API).
+- Undo functionality for accidental sorting.
+
+
+Here’s a rough time estimate for each phase, assuming **4–6 hours of focused work per day** by a developer familiar with Python and basic ML:
+
+---
+
+### **1. Basic Version (Sort by Date/Year)**
+- **Time**: **4–8 hours**  
+  - **Breakdown**:
+    - EXIF extraction logic: 2h  
+    - File handling and directory creation: 1h  
+    - Testing edge cases (missing EXIF, corrupt files): 1–3h  
+    - Documentation/CLI args: 1h  
+
+---
+
+### **2. Improved Version (Object Detection)**
+- **Time**: **1–2 days (8–16 hours)**  
+  - **Breakdown**:
+    - Setup TensorFlow Lite/MobileNet: 2h  
+    - Object detection inference: 3h  
+    - Configurable category mapping: 2h  
+    - Testing accuracy/performance: 4h  
+    - Integration with basic version: 2h  
+
+---
+
+### **3. Final Revision (Face Recognition)**
+- **Time**: **2–3 days (16–24 hours)**  
+  - **Breakdown**:
+    - Face encoding database setup: 4h  
+    - Face detection/recognition logic: 6h  
+    - Handling edge cases (multiple faces, low light): 4h  
+    - Performance optimization: 3h  
+    - Integration with previous versions: 3h  
+
+---
+
+### **Total Estimate**
+| Version       | Time Estimate  | Notes                                  |
+|---------------|----------------|----------------------------------------|
+| Basic         | 4–8h           | Good for a weekend project.            |
+| Improved      | 8–16h          | Requires ML model setup.               |
+| Face Sorting  | 16–24h         | Most complex (face library quirks).    |
+
+**Total**: **28–48 hours** (1–2 weeks part-time).
+
+---
+
+### **Factors That Could Speed Up/Slow Down**
+- **Faster**:
+  - Using pre-built Docker containers for ML dependencies.
+  - Skipping tests/documentation (not recommended).
+- **Slower**:
+  - Debugging TensorFlow/face-recognition installation issues.
+  - Handling rare image formats (HEIC, RAW).
+  - Optimizing for large datasets (>10k images).
+
+---
+
+### **Suggestions to Save Time**
+1. **Leverage existing libraries**:
+   - Use `face_recognition` (no need to train models).
+   - Use `Pillow`/`exifread` instead of reinventing EXIF parsing.
+2. **Start small**:
+   - Build the basic version first, then incrementally add features.
+3. **Mock ML components early**:
+   - Simulate object detection with placeholder labels during development.
+
+Would you like a prioritized task list to optimize the timeline?
